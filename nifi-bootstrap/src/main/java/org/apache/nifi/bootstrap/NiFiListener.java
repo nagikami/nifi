@@ -64,6 +64,7 @@ public class NiFiListener {
 
         public Listener(final ServerSocket serverSocket, final RunNiFi runner) {
             this.serverSocket = serverSocket;
+            // 初始化socket channel处理线程池
             this.executor = Executors.newFixedThreadPool(2, new ThreadFactory() {
                 @Override
                 public Thread newThread(final Runnable runnable) {
@@ -117,8 +118,10 @@ public class NiFiListener {
                                 // a multi-gigabyte file without any new lines in order to crash the Bootstrap,
                                 // which in turn may cause the Shutdown Hook to shutdown NiFi.
                                 // So we will limit the amount of data to read to 4 KB
+                                // 限制连接发送数据大小为4KB
                                 final InputStream limitingIn = new LimitingInputStream(socket.getInputStream(), 4096);
                                 final BootstrapCodec codec = new BootstrapCodec(runner, limitingIn, socket.getOutputStream());
+                                // 处理命令PORT、STARTED
                                 codec.communicate();
                             } catch (final Throwable t) {
                                 System.out.println("Failed to communicate with NiFi due to " + t);

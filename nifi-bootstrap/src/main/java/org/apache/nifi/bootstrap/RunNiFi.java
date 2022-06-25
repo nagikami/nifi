@@ -156,6 +156,7 @@ public class RunNiFi {
     public RunNiFi(final File bootstrapConfigFile) throws IOException {
         this.bootstrapConfigFile = bootstrapConfigFile;
 
+        // 初始化日志线程池
         loggingExecutor = Executors.newFixedThreadPool(2, new ThreadFactory() {
             @Override
             public Thread newThread(final Runnable runnable) {
@@ -166,6 +167,7 @@ public class RunNiFi {
             }
         });
 
+        // 初始化通知服务管理器（默认邮件通知）
         serviceManager = loadServices();
     }
 
@@ -204,6 +206,7 @@ public class RunNiFi {
         boolean verbose = false;
         String statusHistoryDays = null;
 
+        // 命令参数解析
         final String cmd = args[0];
         if (cmd.equalsIgnoreCase("dump")) {
             if (args.length > 1) {
@@ -264,6 +267,7 @@ public class RunNiFi {
             }
         }
 
+        // 命令验证
         switch (cmd.toLowerCase()) {
             case "start":
             case "run":
@@ -282,9 +286,11 @@ public class RunNiFi {
                 return;
         }
 
+        // 获取启动配置文件（系统属性>环境变量>默认值）
         final File configFile = getDefaultBootstrapConfFile();
         final RunNiFi runNiFi = new RunNiFi(configFile);
 
+        // 执行命令
         Integer exitStatus = null;
         switch (cmd.toLowerCase()) {
             case "start":
@@ -332,8 +338,10 @@ public class RunNiFi {
     }
 
     private static File getDefaultBootstrapConfFile() {
+        // 获取系统属性
         String configFilename = System.getProperty("org.apache.nifi.bootstrap.config.file");
 
+        // 获取环境变量
         if (configFilename == null) {
             final String nifiHome = System.getenv("NIFI_HOME");
             if (nifiHome != null) {
@@ -360,6 +368,7 @@ public class RunNiFi {
 
         final NotificationServiceManager manager = new NotificationServiceManager();
         final String attemptProp = properties.getProperty(NOTIFICATION_ATTEMPTS_PROP);
+        // 设置通知最大重试次数
         if (attemptProp != null) {
             try {
                 final int maxAttempts = Integer.parseInt(attemptProp.trim());
@@ -377,6 +386,7 @@ public class RunNiFi {
             return manager;
         }
 
+        // 获取通知服务xml文件
         final File xmlFile = new File(notificationServicesXmlFilename);
         final File servicesFile;
 
@@ -399,6 +409,7 @@ public class RunNiFi {
             defaultLogger.error("Bootstrap Notification Services file configured as " + servicesFile + " but failed to load notification services", e);
         }
 
+        // 按类型注册通知服务
         registerNotificationServices(manager, NotificationType.NIFI_STARTED, properties.getProperty(NIFI_START_NOTIFICATION_SERVICE_IDS_PROP));
         registerNotificationServices(manager, NotificationType.NIFI_STOPPED, properties.getProperty(NIFI_STOP_NOTIFICATION_SERVICE_IDS_PROP));
         registerNotificationServices(manager, NotificationType.NIFI_DIED, properties.getProperty(NIFI_DEAD_NOTIFICATION_SERVICE_IDS_PROP));
@@ -420,6 +431,7 @@ public class RunNiFi {
             }
 
             try {
+                // 按类型注册服务
                 manager.registerNotificationService(type, trimmed);
                 registered++;
             } catch (final Exception e) {

@@ -81,6 +81,7 @@ public class BootstrapCodec {
 
                 final String secretKey = args[1];
 
+                // 设置控制端口号
                 runner.setNiFiCommandControlPort(port, secretKey);
                 writer.write("OK");
                 writer.newLine();
@@ -97,6 +98,7 @@ public class BootstrapCodec {
                 }
 
                 final boolean started = Boolean.parseBoolean(args[0]);
+                // 设置启动状态
                 runner.setNiFiStarted(started);
                 writer.write("OK");
                 writer.newLine();

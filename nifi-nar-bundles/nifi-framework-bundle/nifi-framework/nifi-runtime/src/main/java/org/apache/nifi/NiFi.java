@@ -24,6 +24,7 @@ import org.apache.nifi.nar.NarClassLoadersHolder;
 import org.apache.nifi.nar.NarUnpacker;
 import org.apache.nifi.nar.SystemBundle;
 import org.apache.nifi.processor.DataUnit;
+import org.apache.nifi.properties.NiFiPropertiesLoader;
 import org.apache.nifi.util.DiagnosticUtils;
 import org.apache.nifi.util.FileUtils;
 import org.apache.nifi.util.NiFiProperties;
@@ -205,6 +206,7 @@ public class NiFi implements NiFiEntryPoint {
     private static ClassLoader createBootstrapClassLoader() {
         //Get list of files in bootstrap folder
         final List<URL> urls = new ArrayList<>();
+        // 遍历lib/bootstrap下的jar
         try (final Stream<Path> files = Files.list(Paths.get("lib/bootstrap"))) {
             files.forEach(p -> {
                 try {
@@ -216,7 +218,7 @@ public class NiFi implements NiFiEntryPoint {
         } catch (IOException ioe) {
             LOGGER.warn("Unable to access lib/bootstrap to create bootstrap classloader", ioe);
         }
-        //Create the bootstrap classloader
+        //Create the bootstrap classloader 自定义NiFi启动类加载器加载lib/bootstrap下的类，设置父加载器为线程上下文类加载器
         return new URLClassLoader(urls.toArray(new URL[0]), Thread.currentThread().getContextClassLoader());
     }
 
@@ -320,7 +322,7 @@ public class NiFi implements NiFiEntryPoint {
 
     /**
      * Main entry point of the application.
-     *
+     * 应用主入口
      * @param args things which are ignored
      */
     public static void main(String[] args) {
@@ -343,11 +345,12 @@ public class NiFi implements NiFiEntryPoint {
         return properties;
     }
 
-    private static NiFiProperties initializeProperties(final String[] args, final ClassLoader boostrapLoader) {
+    private static NiFiProperties initializeProperties(final String[] args, final ClassLoader bootstrapLoader) {
         // Try to get key
         // If key doesn't exist, instantiate without
         // Load properties
         // If properties are protected and key missing, throw RuntimeException
+        // 获取线程上下文类加载器（应用类加载器）
 
         final ClassLoader contextClassLoader = Thread.currentThread().getContextClassLoader();
         final String key;
@@ -358,10 +361,11 @@ public class NiFi implements NiFiEntryPoint {
             final String msg = "The bootstrap process did not provide a valid key";
             throw new IllegalArgumentException(msg, e);
         }
-        Thread.currentThread().setContextClassLoader(boostrapLoader);
+        // 设置线程类加载器为NiFi启动类加载器（父类加载器为应用类加载器）
+        Thread.currentThread().setContextClassLoader(bootstrapLoader);
 
         try {
-            final Class<?> propsLoaderClass = Class.forName("org.apache.nifi.properties.NiFiPropertiesLoader", true, boostrapLoader);
+            final Class<?> propsLoaderClass = Class.forName("org.apache.nifi.properties.NiFiPropertiesLoader", true, bootstrapLoader);
             final Method withKeyMethod = propsLoaderClass.getMethod("withKey", String.class);
             final Object loaderInstance = withKeyMethod.invoke(null, key);
             final Method getMethod = propsLoaderClass.getMethod("get");
