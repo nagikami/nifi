@@ -1291,6 +1291,7 @@ public class RunNiFi {
             cmd.add("--add-modules=java.xml.bind");
         }
         cmd.add("org.apache.nifi.NiFi");
+        // 配置用于加密敏感配置的key，NiFi.main中会验证启动参数中的-K及其参数
         if (isSensitiveKeyPresent(props)) {
             Path sensitiveKeyFile = createSensitiveKeyFile(confDir);
             writeSensitiveKeyFile(props, sensitiveKeyFile);

@@ -23,6 +23,9 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+/**
+ * 自定义appender类
+ */
 public class ListAppender extends AppenderBase<LoggingEvent> {
     private static final List<LoggingEvent> LOGGING_EVENTS = Collections.synchronizedList(new ArrayList<>());
 

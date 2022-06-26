@@ -112,7 +112,7 @@ public class NiFi implements NiFiEntryPoint {
                 }
 
                 bootstrapListener = new BootstrapListener(this, port);
-                bootstrapListener.start(properties.getDefaultListenerBootstrapPort());
+                //bootstrapListener.start(properties.getDefaultListenerBootstrapPort());
             } catch (final NumberFormatException nfe) {
                 throw new RuntimeException("Failed to start NiFi because system property '" + BOOTSTRAP_PORT_PROPERTY + "' is not a valid integer in the range 1 - 65535");
             }
@@ -172,7 +172,7 @@ public class NiFi implements NiFiEntryPoint {
 
             if (bootstrapListener != null) {
                 bootstrapListener.setNiFiLoaded(true);
-                bootstrapListener.sendStartedStatus(true);
+                //bootstrapListener.sendStartedStatus(true);
             }
 
             final long duration = System.nanoTime() - startTime;
@@ -415,18 +415,18 @@ public class NiFi implements NiFiEntryPoint {
             throw new IllegalArgumentException("The bootstrap process provided the " + KEY_FILE_FLAG + " flag but no key");
         }
         try {
-            String passwordfilePath = parsedArgs.get(i + 1);
+            String passwordFilePath = parsedArgs.get(i + 1);
             // Slurp in the contents of the file:
-            byte[] encoded = Files.readAllBytes(Paths.get(passwordfilePath));
+            byte[] encoded = Files.readAllBytes(Paths.get(passwordFilePath));
             key = new String(encoded, StandardCharsets.UTF_8);
             if (0 == key.length())
-                throw new IllegalArgumentException("Key in keyfile " + passwordfilePath + " yielded an empty key");
+                throw new IllegalArgumentException("Key in keyfile " + passwordFilePath + " yielded an empty key");
 
-            LOGGER.debug("Overwriting temporary bootstrap key file [{}]", passwordfilePath);
+            LOGGER.debug("Overwriting temporary bootstrap key file [{}]", passwordFilePath);
 
             // Overwrite the contents of the file (to avoid littering file system
             // unlinked with key material):
-            File passwordFile = new File(passwordfilePath);
+            File passwordFile = new File(passwordFilePath);
             FileWriter overwriter = new FileWriter(passwordFile, false);
 
             // Construe a random pad:
@@ -440,7 +440,7 @@ public class NiFi implements NiFiEntryPoint {
             overwriter.write(pad);
             overwriter.close();
 
-            LOGGER.debug("Removing temporary bootstrap key file [{}]", passwordfilePath);
+            LOGGER.debug("Removing temporary bootstrap key file [{}]", passwordFilePath);
             passwordFile.delete();
 
         } catch (IOException e) {
