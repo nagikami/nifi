@@ -22,8 +22,14 @@
         </encoder>
     </appender>
 
+    <appender name="console" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
+            <pattern>%-4r [%t] %-5p %c - %m%n</pattern>
+        </encoder>
+    </appender>
+
     <logger name="org.apache.nifi.processor" level="DEBUG"/>
     <root level="DEBUG">
-        <appender-ref ref="TEST"/>
+        <appender-ref ref="console"/>
     </root>
 </configuration>
