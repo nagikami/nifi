@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 package org.apache.nifi;
-;
+
 import org.apache.commons.lang3.StringUtils;
 import org.apache.nifi.util.NiFiProperties;
 import org.junit.jupiter.api.AfterEach;

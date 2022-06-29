@@ -152,9 +152,11 @@ public class NiFiPropertiesLoader {
         final NiFiProperties properties;
 
         if (protectedProperties.hasProtectedKeys()) {
+            // 自定义NiFi启动类加载器
             final ClassLoader contextClassLoader = Thread.currentThread().getContextClassLoader();
 
             try {
+                // 自定义属性类加载器，父类加载器为NiFi启动类加载器
                 final PropertyProtectionURLClassLoader protectionClassLoader = new PropertyProtectionURLClassLoader(contextClassLoader);
                 Thread.currentThread().setContextClassLoader(protectionClassLoader);
 
@@ -278,6 +280,7 @@ public class NiFiPropertiesLoader {
             final Class<? extends SensitivePropertyProviderFactory> factoryClass = providerFactory.getClass();
             try {
                 // Set Bootstrap Key using reflection to preserve ClassLoader isolation
+                // 使用反射保证类加载隔离
                 final Method setMethod = factoryClass.getMethod(SET_KEY_METHOD, String.class);
                 setMethod.invoke(providerFactory, keyHex);
             } catch (final NoSuchMethodException e) {

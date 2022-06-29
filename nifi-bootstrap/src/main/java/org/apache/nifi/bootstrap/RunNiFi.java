@@ -1207,6 +1207,7 @@ public class RunNiFi {
             throw new RuntimeException("Could not find conf directory at " + confDir.getAbsolutePath());
         }
 
+        // 添加conf和lib到classpath
         final List<String> cpFiles = new ArrayList<>(confFiles.length + libFiles.length);
         cpFiles.add(confDir.getAbsolutePath());
         for (final File file : libFiles) {
