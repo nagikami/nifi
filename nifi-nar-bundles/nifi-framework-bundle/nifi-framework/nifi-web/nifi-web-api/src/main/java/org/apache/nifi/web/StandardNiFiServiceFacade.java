@@ -771,10 +771,12 @@ public class StandardNiFiServiceFacade implements NiFiServiceFacade {
 
     @Override
     public ProcessorEntity updateProcessor(final Revision revision, final ProcessorDTO processorDTO) {
-        // get the component, ensure we have access to it, and perform the update request
+        // get the component, ensure we have access to it, and perform the update request 获取处理器
         final ProcessorNode processorNode = processorDAO.getProcessor(processorDTO.getId());
+        // 更新处理器
         final RevisionUpdate<ProcessorDTO> snapshot = updateComponent(revision,
                 processorNode,
+                // 更新处理器
                 () -> processorDAO.updateProcessor(processorDTO),
                 proc -> {
                     awaitValidationCompletion(proc);
@@ -890,7 +892,7 @@ public class StandardNiFiServiceFacade implements NiFiServiceFacade {
     /**
      * Updates a component with the given revision, using the provided supplier to call
      * into the appropriate DAO and the provided function to convert the component into a DTO.
-     *
+     * 更新组件
      * @param revision    the current revision
      * @param daoUpdate   a Supplier that will update the component via the appropriate DAO
      * @param dtoCreation a Function to convert a component into a dao

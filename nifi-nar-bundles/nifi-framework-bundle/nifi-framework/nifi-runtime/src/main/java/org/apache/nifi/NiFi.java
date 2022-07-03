@@ -24,7 +24,6 @@ import org.apache.nifi.nar.NarClassLoadersHolder;
 import org.apache.nifi.nar.NarUnpacker;
 import org.apache.nifi.nar.SystemBundle;
 import org.apache.nifi.processor.DataUnit;
-import org.apache.nifi.properties.NiFiPropertiesLoader;
 import org.apache.nifi.util.DiagnosticUtils;
 import org.apache.nifi.util.FileUtils;
 import org.apache.nifi.util.NiFiProperties;

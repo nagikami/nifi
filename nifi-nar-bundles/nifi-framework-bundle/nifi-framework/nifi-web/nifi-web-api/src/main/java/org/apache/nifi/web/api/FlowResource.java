@@ -161,6 +161,7 @@ import static org.apache.nifi.web.api.entity.ScheduleComponentsEntity.STATE_ENAB
 /**
  * RESTful endpoint for managing a Flow.
  */
+// 指定url
 @Path("/flow")
 @Api(
         value = "/flow",
@@ -242,9 +243,13 @@ public class FlowResource extends ApplicationResource {
     // flow
     // ----
 
+    // 指定请求方法
     @GET
+    // 指定接收的资源类型
     @Consumes(MediaType.WILDCARD)
+    // 指定返回的资源类型
     @Produces(MediaType.TEXT_PLAIN)
+    // 指定url
     @Path("client-id")
     @ApiOperation(
             value = "Generates a client id.",

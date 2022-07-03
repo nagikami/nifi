@@ -365,7 +365,7 @@ public abstract class ApplicationResource {
 
     /**
      * Checks whether the request is part of a two-phase commit style request (either phase 1 or phase 2)
-     *
+     * 检查请求是否包含X-RequestTransactionId请求头，是则代表使用两阶段提交
      * @param httpServletRequest the request
      * @return <code>true</code> if the request represents a two-phase commit style request
      */
@@ -379,16 +379,18 @@ public abstract class ApplicationResource {
      * as the "commit-request stage") is intended to validate that the request can be completed.
      * In NiFi, we use this phase to validate that the request can complete. This method determines
      * whether or not the request is the first phase of a two-phase commit.
-     *
+     * 判断该请求是否为第一阶段（验证）
      * @param httpServletRequest the request
      * @return <code>true</code> if the request represents a two-phase commit style request and is the
      * first of the two phases.
      */
     protected boolean isValidationPhase(final HttpServletRequest httpServletRequest) {
+        // 是两阶段提交，且包含X-Validation-Expects请求头（第一阶段验证请求可以完成）
         return isTwoPhaseRequest(httpServletRequest) && httpServletRequest.getHeader(RequestReplicator.REQUEST_VALIDATION_HTTP_HEADER) != null;
     }
 
     protected boolean isExecutionPhase(final HttpServletRequest httpServletRequest) {
+        // 是两阶段提交，且包含X-Execution-Continue请求头（第二阶段执行请求）
         return isTwoPhaseRequest(httpServletRequest) && httpServletRequest.getHeader(RequestReplicator.REQUEST_EXECUTION_HTTP_HEADER) != null;
     }
 
@@ -564,8 +566,8 @@ public abstract class ApplicationResource {
     }
 
     /**
-     * Executes an action through the service facade using the specified revision.
-     *
+     * Executes an action through the service facade（表面） using the specified revision.
+     * 通过使用制定版本号的服务面执行action
      * @param serviceFacade service facade
      * @param revision      revision
      * @param authorizer    authorizer
@@ -578,10 +580,13 @@ public abstract class ApplicationResource {
 
         final NiFiUser user = NiFiUserUtils.getNiFiUser();
 
+        // 两阶段提交
         if (isTwoPhaseRequest(httpServletRequest)) {
+            // 第一阶段提交（验证请求是否可以完成）
             if (isValidationPhase(httpServletRequest)) {
                 // authorize access
                 serviceFacade.authorizeAccess(authorizer);
+                // 请求版本校验
                 serviceFacade.verifyRevision(revision, user);
 
                 // verify if necessary
@@ -592,9 +597,11 @@ public abstract class ApplicationResource {
                 // store the request
                 phaseOneStoreTransaction(entity, revision, null);
 
+                // 返回202 accepted代表继续请求
                 return generateContinueResponse().build();
             } else if (isExecutionPhase(httpServletRequest)) {
-                // get the original request and run the action
+                // get the original request and run the action 第二阶段提交，获取保存的第一阶段请求，执行action
+                // 验证事务，两个阶段的用户和uri必须相同
                 final Request<T> phaseOneRequest = phaseTwoVerifyTransaction();
                 return action.apply(phaseOneRequest.getRevision(), phaseOneRequest.getRequest());
             } else if (isCancellationPhase(httpServletRequest)) {
@@ -722,23 +729,26 @@ public abstract class ApplicationResource {
     }
 
     private <T extends Entity> void phaseOneStoreTransaction(final T requestEntity, final Revision revision, final Set<Revision> revisions) {
+        // 验证cache是否超出容量
         if (twoPhaseCommitCache.estimatedSize() > MAX_CACHE_SOFT_LIMIT) {
             throw new IllegalStateException("The maximum number of requests are in progress.");
         }
 
-        // get the transaction id
+        // get the transaction id 获取X-RequestTransactionId两阶段提交事务id
         final String transactionId = httpServletRequest.getHeader(RequestReplicator.REQUEST_TRANSACTION_ID_HEADER);
         if (StringUtils.isBlank(transactionId)) {
             throw new IllegalArgumentException("Two phase commit Transaction Id missing.");
         }
 
+        // 保存请求到缓存
         synchronized (twoPhaseCommitCache) {
             final CacheKey key = new CacheKey(transactionId);
+            // 验证请求是否已经存在
             if (twoPhaseCommitCache.getIfPresent(key) != null) {
                 throw new IllegalStateException("Transaction " + transactionId + " is already in progress.");
             }
 
-            // store the entry for the second phase
+            // store the entry for the second phase 保存第一阶段请求，过期时间为1min
             final NiFiUser user = NiFiUserUtils.getNiFiUser();
             final Request<T> request = new Request<>(ProxiedEntitiesUtils.buildProxiedEntitiesChainString(user), getAbsolutePath().toString(), revision, revisions, requestEntity);
             twoPhaseCommitCache.put(key, request);
@@ -746,13 +756,13 @@ public abstract class ApplicationResource {
     }
 
     private <T extends Entity> Request<T> phaseTwoVerifyTransaction() {
-        // get the transaction id
+        // get the transaction id 获取事务id
         final String transactionId = httpServletRequest.getHeader(RequestReplicator.REQUEST_TRANSACTION_ID_HEADER);
         if (StringUtils.isBlank(transactionId)) {
             throw new IllegalArgumentException("Two phase commit Transaction Id missing.");
         }
 
-        // get the entry for the second phase
+        // get the entry for the second phase 获取一阶段请求
         final Request<T> request;
         synchronized (twoPhaseCommitCache) {
             final CacheKey key = new CacheKey(transactionId);

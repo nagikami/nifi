@@ -76,6 +76,7 @@ public class StandardProcessorDAO extends ComponentDAO implements ProcessorDAO {
     private FlowController flowController;
     private ComponentStateDAO componentStateDAO;
 
+    // 获取处理器
     private ProcessorNode locateProcessor(final String processorId) {
         final ProcessGroup rootGroup = flowController.getFlowManager().getRootGroup();
         final ProcessorNode processor = rootGroup.findProcessor(processorId);
@@ -394,7 +395,7 @@ public class StandardProcessorDAO extends ComponentDAO implements ProcessorDAO {
             try {
                 final ScheduledState purposedScheduledState = ScheduledState.valueOf(processorDTO.getState());
 
-                // only attempt an action if it is changing
+                // only attempt an action if it is changing 状态改变
                 if (!purposedScheduledState.equals(processor.getScheduledState())) {
                     // perform the appropriate action
                     switch (purposedScheduledState) {
@@ -406,7 +407,7 @@ public class StandardProcessorDAO extends ComponentDAO implements ProcessorDAO {
                                 case RUNNING:
                                     processor.verifyCanStop();
                                     break;
-                                case DISABLED:
+                                case DISABLED: // 对应enable
                                     processor.verifyCanEnable();
                                     break;
                             }
@@ -501,7 +502,9 @@ public class StandardProcessorDAO extends ComponentDAO implements ProcessorDAO {
 
     @Override
     public ProcessorNode updateProcessor(ProcessorDTO processorDTO) {
+        // 获取处理器
         ProcessorNode processor = locateProcessor(processorDTO.getId());
+        // 获取处理器组
         ProcessGroup parentGroup = processor.getProcessGroup();
 
         // ensure we can perform the update

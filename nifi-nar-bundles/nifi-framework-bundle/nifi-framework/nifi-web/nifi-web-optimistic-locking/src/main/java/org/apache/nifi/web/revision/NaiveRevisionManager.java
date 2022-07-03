@@ -113,6 +113,7 @@ public class NaiveRevisionManager implements RevisionManager {
         final List<Revision> revisionList = new ArrayList<>(originalClaim.getRevisions());
         revisionList.sort(new RevisionComparator());
 
+        // 验证版本号
         for (final Revision revision : revisionList) {
             final Revision currentRevision = getRevision(revision.getComponentId());
             final boolean verified = revision.equals(currentRevision);

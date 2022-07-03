@@ -987,7 +987,7 @@ public class ProcessorResource extends ApplicationResource {
 
     /**
      * Updates the operational status for the specified processor with the specified values.
-     *
+     * 更新指定处理器的操作状态
      * @param httpServletRequest request
      * @param id                 The id of the processor to update.
      * @param requestRunStatus    A processorEntity.
@@ -1033,15 +1033,18 @@ public class ProcessorResource extends ApplicationResource {
             throw new IllegalArgumentException("Revision must be specified.");
         }
 
+        // 验证状态
         requestRunStatus.validateState();
 
         if (isReplicateRequest()) {
+            // 复制请求到cluster
             return replicate(HttpMethod.PUT, requestRunStatus);
         } else if (isDisconnectedFromCluster()) {
             verifyDisconnectedNodeModification(requestRunStatus.isDisconnectedNodeAcknowledged());
         }
 
         // handle expects request (usually from the cluster manager)
+        // 获取请求版本
         final Revision requestRevision = getRevision(requestRunStatus.getRevision(), id);
         return withWriteLock(
                 serviceFacade,
@@ -1055,7 +1058,7 @@ public class ProcessorResource extends ApplicationResource {
                 },
                 () -> serviceFacade.verifyUpdateProcessor(createDTOWithDesiredRunStatus(id, requestRunStatus.getState())),
                 (revision, runStatusEntity) -> {
-                    // update the processor
+                    // update the processor 更新处理器
                     final ProcessorEntity entity = serviceFacade.updateProcessor(revision, createDTOWithDesiredRunStatus(id, runStatusEntity.getState()));
                     populateRemainingProcessorEntityContent(entity);
 
