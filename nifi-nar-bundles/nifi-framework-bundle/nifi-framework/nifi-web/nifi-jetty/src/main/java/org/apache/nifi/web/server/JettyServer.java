@@ -192,13 +192,13 @@ public class JettyServer implements NiFiServer, ExtensionUiLoader {
         this.server = new Server(threadPool);
 
         // enable the annotation based configuration to ensure the jsp container is initialized properly
-        final Configuration.ClassList classlist = Configuration.ClassList.setServerDefault(server);
-        classlist.addBefore(JettyWebXmlConfiguration.class.getName(), AnnotationConfiguration.class.getName());
+        final Configuration.ClassList classList = Configuration.ClassList.setServerDefault(server);
+        classList.addBefore(JettyWebXmlConfiguration.class.getName(), AnnotationConfiguration.class.getName());
 
         // configure server
         configureConnectors(server);
 
-        // load wars from the bundle
+        // load wars from the bundle 从nar解压路径（work/nar/framework|extensions）获取war
         final Handler warHandlers = loadInitialWars(bundles);
 
         final HandlerList allHandlers = new HandlerList();

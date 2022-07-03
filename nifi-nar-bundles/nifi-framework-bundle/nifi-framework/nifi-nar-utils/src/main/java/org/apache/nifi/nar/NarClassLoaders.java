@@ -101,6 +101,15 @@ public final class NarClassLoaders {
     }
 
     // Default to NiFi's framework NAR ID
+
+    /**
+     * @param rootClassloader
+     * @param frameworkWorkingDir work/nar/framework
+     * @param extensionsWorkingDir work/nar/extensions
+     * @param logDetails
+     * @throws IOException
+     * @throws ClassNotFoundException
+     */
     public void init(final ClassLoader rootClassloader,
                      final File frameworkWorkingDir, final File extensionsWorkingDir, final boolean logDetails) throws IOException, ClassNotFoundException {
         init(rootClassloader, frameworkWorkingDir, extensionsWorkingDir, NarClassLoaders.FRAMEWORK_NAR_ID, logDetails);
@@ -112,9 +121,9 @@ public final class NarClassLoaders {
      * it can be safely called any number of times provided the same framework
      * and extension working dirs are used.
      *
-     * @param rootClassloader the root classloader to use for booting Jetty
-     * @param frameworkWorkingDir where to find framework artifacts
-     * @param extensionsWorkingDir where to find extension artifacts
+     * @param rootClassloader the root classloader to use for booting Jetty 应用类加载器
+     * @param frameworkWorkingDir where to find framework artifacts 解压后的framework nar
+     * @param extensionsWorkingDir where to find extension artifacts 解压后的extension nar
      * @throws java.io.IOException if any issue occurs while exploding nar working directories.
      * @throws java.lang.ClassNotFoundException if unable to load class definition
      * @throws IllegalStateException already initialized with a given pair of
@@ -126,6 +135,7 @@ public final class NarClassLoaders {
             throw new NullPointerException("cannot have empty arguments");
         }
 
+        // 单例静态内部类
         InitContext ic = initContext;
         if (ic == null) {
             synchronized (this) {
@@ -139,19 +149,24 @@ public final class NarClassLoaders {
 
     /**
      * Should be called at most once.
+     * 最多调用一次，单例
      */
     private InitContext load(final ClassLoader rootClassloader, final File frameworkWorkingDir, final File extensionsWorkingDir,
                              final String frameworkNarId, final boolean logDetails)
             throws IOException, ClassNotFoundException {
 
-        // find all nar files and create class loaders for them.
+        // find all nar files and create class loaders for them. 查找所有的解压的nar并创建类加载器
+        // nar路径到nar信息和类加载器的映射
         final Map<String, Bundle> narDirectoryBundleLookup = new LinkedHashMap<>();
+        // nar gav到类加载器的映射
         final Map<String, ClassLoader> narCoordinateClassLoaderLookup = new HashMap<>();
+        // nar id到gav的映射
         final Map<String, Set<BundleCoordinate>> narIdBundleLookup = new HashMap<>();
 
         // make sure the nar directory is there and accessible
         final List<File> narWorkingDirContents = new ArrayList<>();
 
+        // 获取work/nar/framework下的nar解压路径
         if (frameworkWorkingDir != null) {
             FileUtils.ensureDirectoryExistAndCanReadAndWrite(frameworkWorkingDir);
             final File[] frameworkWorkingDirContents = frameworkWorkingDir.listFiles();
@@ -160,6 +175,7 @@ public final class NarClassLoaders {
             }
         }
 
+        // 获取work/extensions下的nar解压路径
         FileUtils.ensureDirectoryExistAndCanReadAndWrite(extensionsWorkingDir);
         final File[] extensionsWorkingDirContents = extensionsWorkingDir.listFiles();
         if (extensionsWorkingDirContents != null) {
@@ -175,6 +191,7 @@ public final class NarClassLoaders {
             for (final File unpackedNar : narWorkingDirContents) {
                 BundleDetails narDetail = null;
                 try {
+                    // 从nar解压路径获取nar元信息
                      narDetail = getNarDetails(unpackedNar);
                 } catch (IllegalStateException e) {
                     logger.warn("Unable to load NAR {} due to {}, skipping...",
@@ -182,7 +199,8 @@ public final class NarClassLoaders {
                     continue;
                 }
 
-                // prevent the application from starting when there are two NARs with same group, id, and version
+                // prevent the application from starting when there are two NARs with same group, id, and version nar冲突则抛异常
+                // narCoordinate为nar的gav
                 final String narCoordinate = narDetail.getCoordinate().getCoordinate();
                 if (narCoordinatesToWorkingDir.containsKey(narCoordinate)) {
                     final String existingNarWorkingDir = narCoordinatesToWorkingDir.get(narCoordinate);
@@ -192,6 +210,7 @@ public final class NarClassLoaders {
                 }
 
                 narDetails.add(narDetail);
+                // 保存gav和nar解压路径的映射
                 narCoordinatesToWorkingDir.put(narCoordinate, narDetail.getWorkingDirectory().getCanonicalPath());
             }
 
@@ -202,16 +221,19 @@ public final class NarClassLoaders {
 
                 // look for the jetty nar
                 if (JETTY_NAR_ID.equals(narDetail.getCoordinate().getId())) {
-                    // create the jetty classloader
+                    // create the jetty classloader 创建jetty nar类加载器，继承自URLClassLoader，parent为应用类加载器
                     jettyClassLoader = createNarClassLoader(narDetail.getWorkingDirectory(), rootClassloader, logDetails);
 
                     // remove the jetty nar since its already loaded
+                    // 添加nar路径到nar信息和类加载器的映射
                     narDirectoryBundleLookup.put(narDetail.getWorkingDirectory().getCanonicalPath(), new Bundle(narDetail, jettyClassLoader));
+                    // 添加nar gav到类加载器的映射
                     narCoordinateClassLoaderLookup.put(narDetail.getCoordinate().getCoordinate(), jettyClassLoader);
+                    // 删除已经加载的nar
                     narDetailsIter.remove();
                 }
 
-                // populate bundle lookup
+                // populate bundle lookup 添加nar id到gav的映射
                 narIdBundleLookup.computeIfAbsent(narDetail.getCoordinate().getId(), id -> new HashSet<>()).add(narDetail.getCoordinate());
             }
 
@@ -219,28 +241,31 @@ public final class NarClassLoaders {
             Map<NiFiServer, String> niFiServers = new HashMap<>();
             int narCount;
             do {
-                // record the number of nars to be loaded
+                // record the number of nars to be loaded 记录需要加载的nar的数量
                 narCount = narDetails.size();
 
                 // attempt to create each nar class loader
                 for (final Iterator<BundleDetails> narDetailsIter = narDetails.iterator(); narDetailsIter.hasNext();) {
                     final BundleDetails narDetail = narDetailsIter.next();
+                    // 获取nar依赖的gav
                     final BundleCoordinate narDependencyCoordinate = narDetail.getDependencyCoordinate();
 
-                    // see if this class loader is eligible for loading
+                    // see if this class loader is eligible（有资格） for loading
                     ClassLoader narClassLoader = null;
+                    // 如果nar没有依赖，parent就为jetty类加载器>系统类加载器
                     if (narDependencyCoordinate == null) {
                         final ClassLoader parentClassLoader = jettyClassLoader == null ? ClassLoader.getSystemClassLoader() : jettyClassLoader;
                         narClassLoader = createNarClassLoader(narDetail.getWorkingDirectory(), parentClassLoader, logDetails);
                     } else {
+                        // 如果nar存在依赖，获取nar依赖的gav
                         final String dependencyCoordinateStr = narDependencyCoordinate.getCoordinate();
 
-                        // if the declared dependency has already been loaded
+                        // if the declared dependency has already been loaded 如果依赖的nar已经加载，将依赖nar的类加载器作为parent
                         if (narCoordinateClassLoaderLookup.containsKey(dependencyCoordinateStr)) {
                             final ClassLoader narDependencyClassLoader = narCoordinateClassLoaderLookup.get(dependencyCoordinateStr);
                             narClassLoader = createNarClassLoader(narDetail.getWorkingDirectory(), narDependencyClassLoader, logDetails);
                         } else {
-                            // get all bundles that match the declared dependency id
+                            // get all bundles that match the declared dependency id 依赖的nar还未加载，全局查找
                             final Set<BundleCoordinate> coordinates = narIdBundleLookup.get(narDependencyCoordinate.getId());
 
                             // ensure there are known bundles that match the declared dependency id
@@ -268,10 +293,18 @@ public final class NarClassLoaders {
                     if (bundleClassLoader != null) {
                         narDirectoryBundleLookup.put(narDetail.getWorkingDirectory().getCanonicalPath(), new Bundle(narDetail, bundleClassLoader));
                         String coordinate = narDetail.getCoordinate().getCoordinate();
+                        // 添加nar gav到类加载器的映射
                         narCoordinateClassLoaderLookup.put(coordinate, narClassLoader);
                         narDetailsIter.remove();
                         // Search for a NiFiServer implementation
+                        /**
+                         * 查找nar类加载器对应的NiFi server
+                         * ServiceLoader:在运行时使用提供的类加载器加载当前service（接口或者抽象类）对应的provider（接口的实现类或者抽象类的子类），
+                         * 实现动态的服务发现机制 SPI(Service Provider Interface)
+                         * provider在jar的META-INF/services下的配置文件指定
+                         */
                         ServiceLoader<NiFiServer> niFiServerServiceLoader = ServiceLoader.load(NiFiServer.class, narClassLoader);
+                        // 获取service provider对应的实例
                         for (NiFiServer server : niFiServerServiceLoader) {
                             niFiServers.put(server, coordinate);
                         }
@@ -284,16 +317,18 @@ public final class NarClassLoaders {
             if (niFiServers.size() == 0) {
                 serverInstance = null;
             } else if (niFiServers.size() > 1) {
+                // 发现多个NiFiServer时抛出异常
                 String sb = "Expected exactly one implementation of NiFiServer but found " + niFiServers.size() + ": " +
                         niFiServers.entrySet().stream().map((entry) -> entry.getKey().getClass().getName() + " from " + entry.getValue()).collect(Collectors.joining(", "));
                 throw new IOException(sb);
             } else {
                 Map.Entry<NiFiServer, String> nifiServer = niFiServers.entrySet().iterator().next();
+                // 获取NiFi实例
                 serverInstance = nifiServer.getKey();
                 logger.info("Found NiFiServer implementation {} in {}", new Object[]{serverInstance.getClass().getName(), nifiServer.getValue()});
             }
 
-            // see if any nars couldn't be loaded
+            // see if any nars couldn't be loaded 查看是否有未被加载的nar
             for (final BundleDetails narDetail : narDetails) {
                 logger.warn(String.format("Unable to resolve required dependency '%s'. Skipping NAR '%s'",
                         narDetail.getDependencyCoordinate().getId(), narDetail.getWorkingDirectory().getAbsolutePath()));
@@ -301,15 +336,17 @@ public final class NarClassLoaders {
         }
 
         // find the framework bundle, NarUnpacker already checked that there was a framework NAR and that there was only one
+        // 获取framework bundle
         final Bundle frameworkBundle = narDirectoryBundleLookup.values().stream()
                 .filter(b -> b.getBundleDetails().getCoordinate().getId().equals(frameworkNarId))
                 .findFirst().orElse(null);
 
         // find the Jetty bundle
+        // 获取jetty bundle
         final Bundle jettyBundle = narDirectoryBundleLookup.values().stream()
                 .filter(b -> b.getBundleDetails().getCoordinate().getId().equals(JETTY_NAR_ID))
                 .findFirst().orElse(null);
-
+        // 返回初始化上下文（包含nar路径到nar信息和类加载器的映射）
         return new InitContext(frameworkWorkingDir, extensionsWorkingDir, frameworkBundle, jettyBundle, serverInstance, new LinkedHashMap<>(narDirectoryBundleLookup));
     }
 
@@ -474,6 +511,7 @@ public final class NarClassLoaders {
      */
     private static ClassLoader createNarClassLoader(final File narDirectory, final ClassLoader parentClassLoader, final boolean log) throws IOException, ClassNotFoundException {
         logger.debug("Loading NAR file: " + narDirectory.getAbsolutePath());
+        // 创建nar类加载器，继承自URLClassLoader
         final ClassLoader narClassLoader = new NarClassLoader(narDirectory, parentClassLoader);
 
         if (log) {

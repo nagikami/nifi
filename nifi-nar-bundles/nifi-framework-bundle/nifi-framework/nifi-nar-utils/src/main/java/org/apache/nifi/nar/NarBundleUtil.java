@@ -30,6 +30,7 @@ public class NarBundleUtil {
 
     /**
      * Creates a BundleDetails from the given NAR working directory.
+     * 从nar解压路径获取nar元信息
      *
      * @param narDirectory the directory of an exploded NAR which contains a META-INF/MANIFEST.MF
      *

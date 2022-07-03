@@ -80,6 +80,7 @@ public class NiFi implements NiFiEntryPoint {
 
     public NiFi(final NiFiProperties properties)
             throws ClassNotFoundException, IOException, IllegalArgumentException {
+        // 使用应用类加载器初始化NiFi
         this(properties, ClassLoader.getSystemClassLoader());
     }
 
@@ -90,6 +91,7 @@ public class NiFi implements NiFiEntryPoint {
 
         // There can only be one krb5.conf for the overall Java process so set this globally during
         // start up so that processors and our Kerberos authentication code don't have to set this
+        // 当前NiFi服务只有一份全局的krb5.conf
         final File kerberosConfigFile = properties.getKerberosConfigurationFile();
         if (kerberosConfigFile != null) {
             final String kerberosConfigFilePath = kerberosConfigFile.getAbsolutePath();
@@ -97,9 +99,10 @@ public class NiFi implements NiFiEntryPoint {
             System.setProperty("java.security.krb5.conf", kerberosConfigFilePath);
         }
 
+        // 设置默认异常处理器
         setDefaultUncaughtExceptionHandler();
 
-        // register the shutdown hook
+        // register the shutdown hook 注册虚拟机停止钩子
         addShutdownHook();
 
         final String bootstrapPort = System.getProperty(BOOTSTRAP_PORT_PROPERTY);
@@ -131,27 +134,31 @@ public class NiFi implements NiFiEntryPoint {
         FileUtils.deleteFilesInDirectory(webWorkingDir, null, LOGGER, true, true);
         FileUtils.deleteFile(webWorkingDir, LOGGER, 3);
 
+        // 检查时间问题
         detectTimingIssues();
 
         // redirect JUL log events
         initLogging();
 
+        // 根据nifi.nar.library.directory（lib）和应用类加载器初始化bundle
         final Bundle systemBundle = SystemBundle.create(properties, rootClassLoader);
 
-        // expand the nars
+        // expand the nars 解压nar并返回lib下的jar包含的NiFi组件的信息映射（如果存在）
         final ExtensionMapping extensionMapping = NarUnpacker.unpackNars(properties, systemBundle);
 
-        // load the extensions classloaders
+        // load the extensions classloaders 加载nar类加载器
         NarClassLoaders narClassLoaders = NarClassLoadersHolder.getInstance();
 
+        // 初始化nar类加载器
         narClassLoaders.init(rootClassLoader, properties.getFrameworkWorkingDirectory(), properties.getExtensionsWorkingDirectory(), true);
 
-        // load the framework classloader
+        // load the framework classloader 获取framework类加载器
         final ClassLoader frameworkClassLoader = narClassLoaders.getFrameworkBundle().getClassLoader();
         if (frameworkClassLoader == null) {
             throw new IllegalStateException("Unable to find the framework NAR ClassLoader.");
         }
 
+        // 获取bundle信息和对应的类加载器
         final Set<Bundle> narBundles = narClassLoaders.getBundles();
 
         final long startTime = System.nanoTime();
@@ -159,6 +166,7 @@ public class NiFi implements NiFiEntryPoint {
         if (nifiServer == null) {
             throw new IllegalStateException("Unable to find a NiFiServer implementation.");
         }
+        // 设置线程上下文加载器为NiFiServer的类加载器
         Thread.currentThread().setContextClassLoader(nifiServer.getClass().getClassLoader());
         // Filter out the framework NAR from being loaded by the NiFiServer
         nifiServer.initialize(properties,
@@ -166,9 +174,11 @@ public class NiFi implements NiFiEntryPoint {
                 narBundles,
                 extensionMapping);
 
+        // 若被NiFi bootstrap发送shutdown命令则终止启动
         if (shutdown) {
             LOGGER.info("NiFi has been shutdown via NiFi Bootstrap. Will not start Controller");
         } else {
+            // 启动jetty server
             nifiServer.start();
 
             if (bootstrapListener != null) {
@@ -194,6 +204,11 @@ public class NiFi implements NiFiEntryPoint {
     }
 
     protected void addShutdownHook() {
+        /**
+         * 添加虚拟机停止钩子
+         * 当jvm正常退出或者程序调用exit方法时，将按照非确定顺序调用并发调用注册的hook方法
+         * 当使用exit退出时，守护线程和非守护线程会和hook方法同时运行
+         */
         Runtime.getRuntime().addShutdownHook(new Thread(() ->
                 // shutdown the jetty server
                 shutdownHook(false)
@@ -226,7 +241,9 @@ public class NiFi implements NiFiEntryPoint {
 
     public void shutdownHook(final boolean isReload) {
         try {
+            // 停止时记录诊断信息
             runDiagnosticsOnShutdown();
+            // 停止jetty服务
             shutdown();
         } catch (final Throwable t) {
             LOGGER.warn("Problem occurred ensuring Jetty web server was properly terminated", t);
@@ -240,6 +257,7 @@ public class NiFi implements NiFiEntryPoint {
             if (isCreated) {
                 LOGGER.debug("Diagnostic directory has successfully been created.");
             }
+            // 保证诊断文件合法性
             while (DiagnosticUtils.isFileCountExceeded(diagnosticDirectoryPath, properties.getDiagnosticsOnShutdownMaxFileCount())
                     || DiagnosticUtils.isSizeExceeded(diagnosticDirectoryPath, DataUnit.parseDataSize(properties.getDiagnosticsOnShutdownDirectoryMaxSize(), DataUnit.B).longValue())) {
                 final Path oldestFile = DiagnosticUtils.getOldestFile(diagnosticDirectoryPath);
@@ -262,9 +280,11 @@ public class NiFi implements NiFiEntryPoint {
         this.shutdown = true;
 
         LOGGER.info("Application Server shutdown started");
+        // 停止NiFi jetty server
         if (nifiServer != null) {
             nifiServer.stop();
         }
+        // 停止bootstrapListener监听服务
         if (bootstrapListener != null) {
             bootstrapListener.stop();
         }
@@ -295,15 +315,18 @@ public class NiFi implements NiFiEntryPoint {
         final AtomicInteger occurrences = new AtomicInteger(0);
         final Runnable command = () -> {
             final long curMillis = System.currentTimeMillis();
+            // 计算时间间隔
             final long difference = curMillis - lastTriggerMillis.get();
             final long millisOff = Math.abs(difference - 2000L);
             occurrences.incrementAndGet();
+            // 时间间隔超时，则记录
             if (millisOff > 500L) {
                 occurrencesOutOfRange.incrementAndGet();
             }
             lastTriggerMillis.set(curMillis);
         };
 
+        // service调度
         final ScheduledFuture<?> future = service.scheduleWithFixedDelay(command, 2000L, 2000L, TimeUnit.MILLISECONDS);
 
         final TimerTask timerTask = new TimerTask() {
@@ -312,6 +335,7 @@ public class NiFi implements NiFiEntryPoint {
                 future.cancel(true);
                 service.shutdownNow();
 
+                // 在时间范围内，调用次数小于应调用次数，偏差次数大于应偏差次数，则时间异常
                 if (occurrences.get() < minRequiredOccurrences || occurrencesOutOfRange.get() > maxOccurrencesOutOfRange) {
                     LOGGER.warn("NiFi has detected that this box is not responding within the expected timing interval, which may cause "
                             + "Processors to be scheduled erratically. Please see the NiFi documentation for more information.");
@@ -319,6 +343,7 @@ public class NiFi implements NiFiEntryPoint {
             }
         };
         final Timer timer = new Timer(true);
+        // 一分钟后检查service的调度结果
         timer.schedule(timerTask, 60000L);
     }
 
@@ -330,6 +355,7 @@ public class NiFi implements NiFiEntryPoint {
     public static void main(String[] args) {
         LOGGER.info("Launching NiFi...");
         try {
+            // 加载属性
             NiFiProperties properties = convertArgumentsToValidatedNiFiProperties(args);
             new NiFi(properties);
         } catch (final Throwable t) {
@@ -367,8 +393,10 @@ public class NiFi implements NiFiEntryPoint {
         Thread.currentThread().setContextClassLoader(bootstrapLoader);
 
         try {
+            // 使用NiFi启动类加载器加载属性加载器，bootstrapLoader为初始类加载器（触发类加载），AppClassLoader为定义类加载器（实际加载类）
             final Class<?> propsLoaderClass = Class.forName("org.apache.nifi.properties.NiFiPropertiesLoader", true, bootstrapLoader);
             final Method withKeyMethod = propsLoaderClass.getMethod("withKey", String.class);
+            // 使用反射调用静态方法返回属性加载器实例
             final Object loaderInstance = withKeyMethod.invoke(null, key);
             final Method getMethod = propsLoaderClass.getMethod("get");
             final NiFiProperties properties = (NiFiProperties) getMethod.invoke(loaderInstance);

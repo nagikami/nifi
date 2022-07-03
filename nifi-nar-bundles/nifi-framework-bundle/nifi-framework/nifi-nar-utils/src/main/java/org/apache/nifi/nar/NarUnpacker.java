@@ -69,6 +69,7 @@ public final class NarUnpacker {
     }
 
     public static ExtensionMapping unpackNars(final NiFiProperties props, final String frameworkNarId, final Bundle systemBundle) {
+        // 获取所需工作路径
         final List<Path> narLibraryDirs = props.getNarLibraryDirectories();
         final File frameworkWorkingDir = props.getFrameworkWorkingDirectory();
         final File extensionsWorkingDir = props.getExtensionsWorkingDirectory();
@@ -85,6 +86,7 @@ public final class NarUnpacker {
     public static ExtensionMapping unpackNars(final Bundle systemBundle, final File frameworkWorkingDir, final File extensionsWorkingDir, final File docsWorkingDir, final List<Path> narLibraryDirs,
                                               final boolean requireFrameworkNar, final String frameworkNarId,
                                               final boolean requireJettyNar, final boolean verifyHash, final Predicate<BundleCoordinate> narFilter) {
+        // 保存解压的nar信息
         final Map<File, BundleCoordinate> unpackedNars = new HashMap<>();
 
         try {
@@ -104,6 +106,7 @@ public final class NarUnpacker {
                 FileUtils.ensureDirectoryExistAndCanReadAndWrite(docsWorkingDir);
             }
 
+            // 获取所有nar路径（lib、extensions）下nar文件
             for (Path narLibraryDir : narLibraryDirs) {
 
                 File narDir = narLibraryDir.toFile();
@@ -124,7 +127,7 @@ public final class NarUnpacker {
                 for (File narFile : narFiles) {
                     logger.debug("Expanding NAR file: " + narFile.getAbsolutePath());
 
-                    // get the manifest for this nar
+                    // get the manifest for this nar 获取nar的元数据
                     try (final JarFile nar = new JarFile(narFile)) {
                         BundleCoordinate bundleCoordinate = createBundleCoordinate(nar.getManifest());
 
@@ -139,18 +142,18 @@ public final class NarUnpacker {
                                 throw new IllegalStateException("Multiple framework NARs discovered. Only one framework is permitted.");
                             }
 
-                            // unpack the framework nar
+                            // unpack the framework nar 解压framework nar到work/nar/framework下
                             unpackedFramework = unpackNar(narFile, frameworkWorkingDir, verifyHash);
                         } else if (NarClassLoaders.JETTY_NAR_ID.equals(bundleCoordinate.getId())) {
                             if (unpackedJetty != null) {
                                 throw new IllegalStateException("Multiple Jetty NARs discovered. Only one Jetty NAR is permitted.");
                             }
 
-                            // unpack and record the Jetty nar
+                            // unpack and record the Jetty nar 解压jetty nar到work/nar/extensions下
                             unpackedJetty = unpackNar(narFile, extensionsWorkingDir, verifyHash);
                             unpackedExtensions.add(unpackedJetty);
                         } else {
-                            // unpack and record the extension nar
+                            // unpack and record the extension nar 解压extension nar到work/nar/extensions下
                             final File unpackedExtension = unpackNar(narFile, extensionsWorkingDir, verifyHash);
                             unpackedExtensions.add(unpackedExtension);
                         }
@@ -177,6 +180,7 @@ public final class NarUnpacker {
 
                 // Determine if any nars no longer exist and delete their working directories. This happens
                 // if a new version of a nar is dropped into the lib dir. ensure no old framework are present
+                // 删除旧版本的framework
                 if (unpackedFramework != null && frameworkWorkingDir != null) {
                     final File[] frameworkWorkingDirContents = frameworkWorkingDir.listFiles();
                     if (frameworkWorkingDirContents != null) {
@@ -188,7 +192,7 @@ public final class NarUnpacker {
                     }
                 }
 
-                // ensure no old extensions are present
+                // ensure no old extensions are present 删除旧版本的extensions
                 final File[] extensionsWorkingDirContents = extensionsWorkingDir.listFiles();
                 if (extensionsWorkingDirContents != null) {
                     for (final File unpackedNar : extensionsWorkingDirContents) {
@@ -203,13 +207,17 @@ public final class NarUnpacker {
                         + "(" + (int) TimeUnit.SECONDS.convert(duration, TimeUnit.NANOSECONDS) + " seconds).");
             }
 
+            // 保存路径和bundle信息映射表
             unpackedNars.putAll(createUnpackedNarBundleCoordinateMap(extensionsWorkingDir));
             final ExtensionMapping extensionMapping = new ExtensionMapping();
+            // 映射文档到对应的jar
             mapExtensions(unpackedNars, docsWorkingDir, extensionMapping);
 
             // unpack docs for the system bundle which will catch any JARs directly in the lib directory that might have docs
+            // 为系统bundle（id为system）添加文档，workingDirectory为lib
             unpackBundleDocs(docsWorkingDir, extensionMapping, systemBundle.getBundleDetails().getCoordinate(), systemBundle.getBundleDetails().getWorkingDirectory());
 
+            // 返回lib下的jar包含的NiFi组件的信息映射（如果存在）
             return extensionMapping;
         } catch (IOException e) {
             logger.warn("Unable to load NAR library bundles due to " + e + " Will proceed without loading any further Nar bundles");
@@ -223,6 +231,7 @@ public final class NarUnpacker {
 
     /**
      * Creates a map containing the nar directory mapped to it's bundle-coordinate.
+     * 创建路径和bundle信息映射表
      * @param extensionsWorkingDir where to find extensions
      * @return map of coordinates for bundles
      */
@@ -244,8 +253,11 @@ public final class NarUnpacker {
 
     private static BundleCoordinate createBundleCoordinate(Manifest manifest) {
         Attributes mainAttributes = manifest.getMainAttributes();
+        // 获取Nar-Group
         String groupId = mainAttributes.getValue(NarManifestEntry.NAR_GROUP.getManifestName());
+        // 获取Nar-Id
         String narId = mainAttributes.getValue(NarManifestEntry.NAR_ID.getManifestName());
+        // 获取Nar-Version
         String version = mainAttributes.getValue(NarManifestEntry.NAR_VERSION.getManifestName());
         BundleCoordinate bundleCoordinate = new BundleCoordinate(groupId, narId, version);
         return bundleCoordinate;
@@ -256,9 +268,11 @@ public final class NarUnpacker {
             final File unpackedNar = entry.getKey();
             final BundleCoordinate bundleCoordinate = entry.getValue();
 
+            // 拿到nar依赖路径NAR-INF/bundled-dependencies
             final File bundledDependencies = new File(unpackedNar, BUNDLED_DEPENDENCIES_DIRECTORY);
 
             if (docsDirectory != null) {
+                // 添加jar对应文档
                 unpackBundleDocs(docsDirectory, mapping, bundleCoordinate, bundledDependencies);
             }
         }
@@ -405,6 +419,7 @@ public final class NarUnpacker {
 
     /*
      * Returns true if this jar file contains a NiFi component
+     * 如果当前jar包含NiFi组件，添加到ExtensionMapping中
      */
     private static ExtensionMapping determineDocumentedNiFiComponents(final BundleCoordinate coordinate, final File jar) throws IOException {
         final ExtensionMapping mapping = new ExtensionMapping();

@@ -172,7 +172,7 @@ public class NarClassLoader extends AbstractNativeLibHandlingClassLoader {
         super(new URL[0], parentClassLoader, initNativeLibDirList(narWorkingDirectory), narWorkingDirectory.getName());
         this.narWorkingDirectory = narWorkingDirectory;
 
-        // process the classpath
+        // process the classpath 遍历nar路径下的jar，将路径添加到ucp（类加载路径）中
         updateClasspath(narWorkingDirectory);
     }
 

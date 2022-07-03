@@ -68,7 +68,7 @@ public class ExtensionMapping {
             addReportingTask(coordinate, name);
         });
     }
-
+    // 合并两个ExtensionMapping，对processorNames、controllerServiceNames、reportingTaskNames取并集
     void merge(final ExtensionMapping other) {
         other.getProcessorNames().forEach((name, otherCoordinates) -> {
             processorNames.merge(name, otherCoordinates, merger);
