@@ -43,6 +43,7 @@ abstract class AbstractSchedulingAgent implements SchedulingAgent {
         this.flowEngine = flowEngine;
     }
 
+    // 调度处理器
     @Override
     public void schedule(Connectable connectable, LifecycleState scheduleState) {
         scheduleState.setScheduled(true);

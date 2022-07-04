@@ -316,7 +316,7 @@ public final class StandardProcessScheduler implements ProcessScheduler {
      * Starts the given {@link Processor} by invoking its
      * {@link ProcessorNode#start(ScheduledExecutorService, long, long, Supplier, SchedulingAgentCallback, boolean)}
      * method.
-     *
+     * 开启处理器调度
      * @see StandardProcessorNode#start(ScheduledExecutorService, long, long, Supplier, SchedulingAgentCallback, boolean)
      */
     @Override

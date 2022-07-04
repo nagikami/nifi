@@ -39,6 +39,7 @@ import org.springframework.context.ApplicationContextAware;
 
 /**
  * Factory bean for creating a singleton FlowController instance. If the application is configured to act as the cluster manager, then null is always returned as the created instance.
+ * 使用factory bean非静态方法创建bean，静态参考context.xml
  */
 @SuppressWarnings("rawtypes")
 public class FlowControllerFactoryBean implements FactoryBean, ApplicationContextAware {

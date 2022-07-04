@@ -284,7 +284,7 @@ public class JettyServer implements NiFiServer, ExtensionUiLoader {
 
         final ClassLoader frameworkClassLoader = getClass().getClassLoader();
 
-        // load the web ui app
+        // load the web ui app 设置上下文路径为/nifi（根url）
         final WebAppContext webUiContext = loadWar(webUiWar, CONTEXT_PATH_NIFI, frameworkClassLoader);
         webUiContext.getInitParams().put("oidc-supported", String.valueOf(props.isOidcEnabled()));
         webUiContext.getInitParams().put("knox-supported", String.valueOf(props.isKnoxSsoEnabled()));
@@ -293,7 +293,7 @@ public class JettyServer implements NiFiServer, ExtensionUiLoader {
         webUiContext.getInitParams().put("allowedContextPaths", props.getAllowedContextPaths());
         webAppContextHandlers.addHandler(webUiContext);
 
-        // load the web api app
+        // load the web api app 设置上下文路径/nifi-api（根url）在nifi-web-api下的web.xml文件通过配置contextConfigLocation初始化spring容器
         webApiContext = loadWar(webApiWar, CONTEXT_PATH_NIFI_API, frameworkClassLoader);
         webAppContextHandlers.addHandler(webApiContext);
 
@@ -581,6 +581,7 @@ public class JettyServer implements NiFiServer, ExtensionUiLoader {
 
     private WebAppContext loadWar(final File warFile, final String contextPath, final ClassLoader parentClassLoader) {
         final WebAppContext webappContext = new WebAppContext(warFile.getPath(), contextPath);
+        // 设置上下文路径/nifi-api
         webappContext.setContextPath(contextPath);
         webappContext.setDisplayName(contextPath);
 

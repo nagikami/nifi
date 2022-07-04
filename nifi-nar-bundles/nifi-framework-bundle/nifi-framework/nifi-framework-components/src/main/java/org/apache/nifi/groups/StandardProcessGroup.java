@@ -1464,6 +1464,7 @@ public final class StandardProcessGroup implements ProcessGroup {
         }
     }
 
+    // 启动处理器
     @Override
     public Future<Void> startProcessor(final ProcessorNode processor, final boolean failIfStopping) {
         readLock.lock();
@@ -1476,11 +1477,13 @@ public final class StandardProcessGroup implements ProcessGroup {
             if (state == ScheduledState.DISABLED) {
                 throw new IllegalStateException("Processor is disabled");
             } else if (state == ScheduledState.RUNNING) {
+                // 当前正在调度，返回空
                 return CompletableFuture.completedFuture(null);
             }
 
             processor.reloadAdditionalResourcesIfNecessary();
 
+            // 开始调度
             return scheduler.startProcessor(processor, failIfStopping);
         } finally {
             readLock.unlock();

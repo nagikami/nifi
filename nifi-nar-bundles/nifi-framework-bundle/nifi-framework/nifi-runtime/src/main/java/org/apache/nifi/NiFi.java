@@ -165,7 +165,7 @@ public class NiFi implements NiFiEntryPoint {
         if (nifiServer == null) {
             throw new IllegalStateException("Unable to find a NiFiServer implementation.");
         }
-        // 设置线程上下文加载器为NiFiServer的类加载器
+        // 设置线程上下文加载器为NiFiServer的类加载器（NiFiServer对应bundle的nar类加载器）
         Thread.currentThread().setContextClassLoader(nifiServer.getClass().getClassLoader());
         // Filter out the framework NAR from being loaded by the NiFiServer
         nifiServer.initialize(properties,

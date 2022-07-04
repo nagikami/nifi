@@ -22,7 +22,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.ImportResource;
 
 /**
- *
+ * 初始化spring容器
  */
 @Configuration
 @Import({

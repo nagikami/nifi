@@ -66,6 +66,7 @@ public class TimerDrivenSchedulingAgent extends AbstractTimeBasedSchedulingAgent
         logger.info("{} started.", taskNode.getReportingTask());
     }
 
+    // 处理器调度
     @Override
     public void doSchedule(final Connectable connectable, final LifecycleState scheduleState) {
         final List<ScheduledFuture<?>> futures = new ArrayList<>();

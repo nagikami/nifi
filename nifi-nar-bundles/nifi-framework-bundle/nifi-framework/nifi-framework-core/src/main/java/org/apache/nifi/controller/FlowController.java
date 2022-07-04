@@ -457,7 +457,7 @@ public class FlowController implements ReportingTaskProvider, Authorizable, Node
         return flowController;
     }
 
-    @SuppressWarnings("deprecation")
+    @SuppressWarnings("deprecation") // 使用FlowControllerFactoryBean创建bean
     private FlowController(
             final FlowFileEventRepository flowFileEventRepo,
             final NiFiProperties nifiProperties,
